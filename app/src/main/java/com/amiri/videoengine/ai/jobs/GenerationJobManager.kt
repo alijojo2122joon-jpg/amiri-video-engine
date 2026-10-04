@@ -5,6 +5,7 @@ import com.amiri.videoengine.ai.model.JobStage
 import com.amiri.videoengine.ai.model.JobStep
 import com.amiri.videoengine.ai.model.UserInput
 import com.amiri.videoengine.ai.prompt.PromptEngine
+import com.amiri.videoengine.ai.prompt.PromptPreparer
 import com.amiri.videoengine.ai.router.ModelRouter
 import com.amiri.videoengine.ai.router.RoutingException
 import com.amiri.videoengine.image.ImagePreprocessor
@@ -51,6 +52,7 @@ class GenerationJobManager(
     private val images: ImagePreprocessor,
     private val video: VideoPostProcessor,
     private val repo: ProjectRepository,
+    private val prompts: PromptPreparer,
 ) {
     private val _state = MutableStateFlow<JobState?>(null)
     val state: StateFlow<JobState?> = _state.asStateFlow()
@@ -140,10 +142,27 @@ class GenerationJobManager(
             val firstReady = firstOrig?.let { images.prepareForProvider(it, input.aspect) }
             val lastReady = lastOrig?.let { images.prepareForProvider(it, input.aspect) }
 
-            // 3) Prompt.
+            // 3) Prompt: understand it in English (AI rewrite / on-device translation), keep intent.
             set(JobStage.PREPARING, JobStep.ANALYZE_PROMPT, "Analyzing prompt…")
-            val structured = PromptEngine.analyze(input.prompt)
-            if (structured.nonLatin) notes += "Tip: English prompts usually give better results on free engines."
+            val mode = when {
+                firstReady != null && lastReady != null -> com.amiri.videoengine.ai.model.GenerationMode.FIRST_LAST_TO_VIDEO
+                firstReady != null -> com.amiri.videoengine.ai.model.GenerationMode.IMAGE_TO_VIDEO
+                else -> com.amiri.videoengine.ai.model.GenerationMode.TEXT_TO_VIDEO
+            }
+            val reviewed = input.englishPrompt?.trim()?.takeIf { it.isNotEmpty() }
+            val english = if (reviewed != null) {
+                reviewed
+            } else {
+                val prepared = prompts.prepare(input.prompt, mode) { msg ->
+                    set(JobStage.PREPARING, JobStep.ANALYZE_PROMPT, msg)
+                }
+                if (prepared.method != PromptPreparer.Method.ORIGINAL) notes += "Prompt: ${prepared.method.label}."
+                if (prepared.method == PromptPreparer.Method.ORIGINAL && prompts.isNonEnglish(input.prompt)) {
+                    notes += "Your prompt could not be translated, so the engine may not understand it. Check the internet connection or write it in English."
+                }
+                prepared.english
+            }
+            val structured = PromptEngine.analyze(english)
             val baseRequest = GenerationRequest(
                 prompt = input.prompt,
                 finalPrompt = "",
@@ -157,7 +176,7 @@ class GenerationJobManager(
                 seed = input.advanced.seed,
                 resolution = input.advanced.resolution,
             )
-            val finalPrompt = PromptEngine.buildFinalPrompt(structured, baseRequest.mode, input.quality)
+            val finalPrompt = if (reviewed != null) reviewed else PromptEngine.buildFinalPrompt(structured, baseRequest.mode, input.quality)
             _state.update { it?.copy(notes = notes.toList()) }
 
             var project = Project(

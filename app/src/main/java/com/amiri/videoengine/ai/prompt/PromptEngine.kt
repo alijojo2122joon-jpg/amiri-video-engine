@@ -78,24 +78,21 @@ object PromptEngine {
     /** True when the prompt suggests a change from one state to another (two-image mode). */
     fun suggestsTransition(prompt: String): Boolean = analyze(prompt).transition != null
 
+    /**
+     * The user's (English) prompt is sent almost unchanged. Extra boilerplate made models
+     * ignore the user's actions, so only very short prompts get a light cinematic hint.
+     */
     fun buildFinalPrompt(s: StructuredPrompt, mode: GenerationMode, quality: QualityPreset): String {
-        val additions = mutableListOf<String>()
-        if (s.camera == null) additions += "steady cinematic camera"
-        if (s.lighting == null && s.timeOfDay == null) additions += "natural, consistent lighting"
-        if (s.motion == null) additions += "smooth natural motion"
-        if (s.style == null && s.realism == null) additions += "realistic detail and believable physics"
-        when (mode) {
-            GenerationMode.IMAGE_TO_VIDEO ->
-                additions += "keep the subject's identity, clothing, the environment, composition and important objects exactly as in the starting image"
-            GenerationMode.FIRST_LAST_TO_VIDEO ->
-                additions += "start exactly as the first image, move with controlled continuous motion, and end exactly matching the final image"
-            GenerationMode.TEXT_TO_VIDEO -> Unit
-        }
-        if (quality != QualityPreset.FAST) additions += "high detail, sharp focus"
-        val base = s.original.trimEnd('.', ' ')
-        return if (additions.isEmpty()) base else base + ". " + additions.joinToString(", ") + "."
+        val base = s.original.trim().trimEnd('.', ' ')
+        val words = base.split(Regex("\\s+")).count { it.isNotBlank() }
+        if (words >= 8) return "$base."
+        val extra = mutableListOf<String>()
+        if (s.camera == null) extra += "cinematic shot"
+        if (s.motion == null && mode != GenerationMode.FIRST_LAST_TO_VIDEO) extra += "natural motion"
+        if (quality != QualityPreset.FAST) extra += "high detail"
+        return if (extra.isEmpty()) "$base." else base + ", " + extra.joinToString(", ") + "."
     }
 
     const val NEGATIVE_PROMPT =
-        "blurry, low quality, distorted face, extra limbs, deformed hands, flicker, jitter, watermark, text, logo, static frame"
+        "blurry, low quality, distorted face, extra limbs, deformed hands, flicker, jitter, watermark, text, logo"
 }

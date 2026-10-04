@@ -11,9 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.amiri.videoengine.AmiriApp
+import com.amiri.videoengine.AppContainer
 import com.amiri.videoengine.ai.model.AdvancedOptions
 import com.amiri.videoengine.ai.model.AspectRatio
 import com.amiri.videoengine.ai.model.DurationPreset
+import com.amiri.videoengine.ai.model.GenerationMode
 import com.amiri.videoengine.ai.model.ProviderStatus
 import com.amiri.videoengine.ai.model.QualityPreset
 import com.amiri.videoengine.ai.model.ResolutionPreset
@@ -61,6 +63,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var resolution by mutableStateOf(ResolutionPreset.AUTO)
     var variations by mutableIntStateOf(1)
     var formError by mutableStateOf<String?>(null)
+
+    // English prompt the engine will receive (previewed / editable by the user).
+    var englishPrompt by mutableStateOf("")
+    var englishSource by mutableStateOf("")
+        private set
+    var englishMethod by mutableStateOf<String?>(null)
+        private set
+    var preparingEnglish by mutableStateOf(false)
+        private set
+    val englishIsCurrent: Boolean
+        get() = englishPrompt.isNotBlank() && englishSource == prompt.trim()
 
     // ---- Settings ----
     val statuses = mutableStateMapOf<String, ProviderStatus>()
@@ -124,6 +137,38 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------------- Prompt preview ----------------
+
+    private fun currentMode(): GenerationMode {
+        val first = images[ImageSlot.FIRST] ?: images[ImageSlot.REFERENCE] ?: images[ImageSlot.LAST]
+        val second = if (images[ImageSlot.FIRST] != null) images[ImageSlot.LAST] else null
+        return when {
+            first != null && second != null -> GenerationMode.FIRST_LAST_TO_VIDEO
+            first != null -> GenerationMode.IMAGE_TO_VIDEO
+            else -> GenerationMode.TEXT_TO_VIDEO
+        }
+    }
+
+    fun previewEnglish() {
+        val src = prompt.trim()
+        if (src.isEmpty() || preparingEnglish) return
+        viewModelScope.launch {
+            preparingEnglish = true
+            try {
+                val prepared = c.prompts.prepare(src, currentMode())
+                englishPrompt = prepared.english
+                englishMethod = prepared.method.label
+                englishSource = src
+            } catch (_: Exception) {
+                toast("Could not prepare the prompt. Check your internet.")
+            } finally {
+                preparingEnglish = false
+            }
+        }
+    }
+
+    fun isNonEnglish(text: String) = c.prompts.isNonEnglish(text)
+
     // ---------------- Generate ----------------
 
     fun generate() {
@@ -161,6 +206,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 resolution = resolution,
                 variations = variations,
             ),
+            englishPrompt = if (englishIsCurrent) englishPrompt.trim() else null,
         )
         c.jobs.start(input)
         navigate(Screen.Generating)
@@ -214,6 +260,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             clearForm()
             prompt = p.prompt
+            if (p.finalPrompt.isNotBlank()) {
+                englishPrompt = p.finalPrompt
+                englishSource = p.prompt.trim()
+                englishMethod = "From this project"
+            }
             fun restore(name: String?, slot: ImageSlot): File? {
                 if (name == null) return null
                 val src = c.projects.file(p, name)
@@ -271,6 +322,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         formError = null
         seedText = ""
         variations = 1
+        englishPrompt = ""
+        englishSource = ""
+        englishMethod = null
         preferredProviderId = null
     }
 
@@ -343,5 +397,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val HF = SecretStore.HF_TOKEN
         val GOOGLE = SecretStore.GOOGLE_KEY
         val XAI = SecretStore.XAI_KEY
+        val PROMPT_AI = AppContainer.PROMPT_AI_ID
     }
 }

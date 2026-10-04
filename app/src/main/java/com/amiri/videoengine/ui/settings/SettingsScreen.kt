@@ -101,6 +101,31 @@ fun SettingsScreen(vm: MainViewModel) {
             )
             Spacer(Modifier.height(10.dp))
             SecretField(vm, MainViewModel.HF, "Hugging Face token (free, optional)", version)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AmiriColors.Surface)
+                    .padding(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("AI prompt helper", style = MaterialTheme.typography.titleMedium, color = AmiriColors.Text)
+                    Text(
+                        "Uses your free token to turn any language into a precise English video prompt. " +
+                            "Without a token, Persian is translated on your phone instead.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AmiriColors.TextDim,
+                    )
+                }
+                val aiOn = remember(version) { vm.isProviderEnabled(MainViewModel.PROMPT_AI) }
+                Switch(
+                    checked = aiOn,
+                    onCheckedChange = { vm.setProviderEnabled(MainViewModel.PROMPT_AI, it) },
+                    colors = SwitchDefaults.colors(checkedTrackColor = AmiriColors.Accent, checkedThumbColor = AmiriColors.Background),
+                )
+            }
             Spacer(Modifier.height(8.dp))
             spaces.forEach { p -> ProviderRow(vm, p, version, removable = !p.spec.builtIn) }
             TextButton(onClick = { vm.refreshStatuses() }) { Text("CHECK STATUS", color = AmiriColors.Accent) }

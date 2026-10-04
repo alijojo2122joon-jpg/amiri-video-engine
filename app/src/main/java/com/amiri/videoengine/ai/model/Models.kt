@@ -75,6 +75,8 @@ data class UserInput(
     val duration: DurationPreset,
     val quality: QualityPreset,
     val advanced: AdvancedOptions,
+    /** English prompt the user already previewed/edited. Null = prepare automatically. */
+    val englishPrompt: String? = null,
 )
 
 data class StructuredPrompt(

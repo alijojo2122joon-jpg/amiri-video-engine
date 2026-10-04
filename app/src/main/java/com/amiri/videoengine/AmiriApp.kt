@@ -2,6 +2,7 @@ package com.amiri.videoengine
 
 import android.app.Application
 import com.amiri.videoengine.ai.jobs.GenerationJobManager
+import com.amiri.videoengine.ai.prompt.PromptPreparer
 import com.amiri.videoengine.ai.providers.VideoGenerationProvider
 import com.amiri.videoengine.ai.providers.cloud.GoogleVeoProvider
 import com.amiri.videoengine.ai.providers.cloud.XaiGrokProvider
@@ -70,6 +71,15 @@ class AppContainer(app: Application) {
         return builtInSpaces + custom + listOf(veo, xai, local)
     }
 
+    val prompts = PromptPreparer(
+        tokenProvider = { secrets.get(SecretStore.HF_TOKEN) },
+        aiEnabled = { providerSettings.isEnabled(PROMPT_AI_ID, true) },
+    )
+
     val router = ModelRouter({ providers() }, connection)
-    val jobs = GenerationJobManager(appScope, router, images, video, projects)
+    val jobs = GenerationJobManager(appScope, router, images, video, projects, prompts)
+
+    companion object {
+        const val PROMPT_AI_ID = "prompt_ai"
+    }
 }

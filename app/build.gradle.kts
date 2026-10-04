@@ -12,8 +12,8 @@ android {
         applicationId = "com.amiri.videoengine"
         minSdk = 29
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     signingConfigs {
@@ -72,4 +72,6 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // On-device Persian -> English prompt translation (free, offline after first download).
+    implementation("com.google.mlkit:translate:17.0.3")
 }

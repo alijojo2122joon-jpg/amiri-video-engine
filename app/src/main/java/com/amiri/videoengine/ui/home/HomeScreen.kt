@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -197,6 +199,8 @@ fun HomeScreen(vm: MainViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            EnglishPromptSection(vm)
+
             Spacer(Modifier.height(18.dp))
             ChoiceRow("Aspect ratio", AspectRatio.entries.toList(), vm.aspect, { it.label }, { vm.chooseAspect(it) })
             Spacer(Modifier.height(14.dp))
@@ -320,4 +324,64 @@ private fun AdvancedSection(vm: MainViewModel) {
         style = MaterialTheme.typography.labelSmall,
         color = AmiriColors.TextDim,
     )
+}
+
+/**
+ * Shows exactly what the video engine will read. Persian prompts are translated / rewritten
+ * to English here, and the user can correct the English before generating.
+ */
+@Composable
+private fun EnglishPromptSection(vm: MainViewModel) {
+    val text = vm.prompt.trim()
+    if (text.isEmpty()) return
+    val nonEnglish = vm.isNonEnglish(text)
+    Spacer(Modifier.height(10.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "WHAT THE ENGINE WILL READ",
+            style = MaterialTheme.typography.labelMedium,
+            color = AmiriColors.TextDim,
+            modifier = Modifier.weight(1f),
+        )
+        if (vm.preparingEnglish) {
+            CircularProgressIndicator(color = AmiriColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+        } else {
+            TextButton(onClick = { vm.previewEnglish() }) {
+                Text(if (vm.englishIsCurrent) "REDO" else "PREVIEW", color = AmiriColors.Accent)
+            }
+        }
+    }
+    if (vm.englishIsCurrent) {
+        OutlinedTextField(
+            value = vm.englishPrompt,
+            onValueChange = { vm.englishPrompt = it },
+            minLines = 3,
+            maxLines = 8,
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AmiriColors.Accent,
+                unfocusedBorderColor = AmiriColors.AccentDim,
+                focusedContainerColor = AmiriColors.Surface,
+                unfocusedContainerColor = AmiriColors.Surface,
+                cursorColor = AmiriColors.Accent,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            (vm.englishMethod ?: "") + " · You can edit it. This exact text is sent.",
+            style = MaterialTheme.typography.labelSmall,
+            color = AmiriColors.TextDim,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    } else {
+        Text(
+            if (nonEnglish) {
+                "Free video models only understand English. Tap PREVIEW to see your prompt in English and fix it if needed — or just generate and it is translated automatically."
+            } else {
+                "Tap PREVIEW to see (and edit) the exact prompt the engine will receive."
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = if (nonEnglish) AmiriColors.Accent else AmiriColors.TextDim,
+        )
+    }
 }
