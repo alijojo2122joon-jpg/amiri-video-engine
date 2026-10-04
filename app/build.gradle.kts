@@ -12,7 +12,7 @@ android {
         applicationId = "com.amiri.videoengine"
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
+        versionCode = 5
         versionName = "1.2.0"
         // realme GT3 (and all modern phones) are 64-bit ARM; drop other CPU libraries to keep the APK small.
         ndk {
@@ -32,7 +32,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 removes unused code (the APK was ~3x bigger without it).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("amiri")
         }
         debug {
