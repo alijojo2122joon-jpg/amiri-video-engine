@@ -14,8 +14,9 @@ object AmiriColors {
     val Surface = Color(0xFF141419)
     val SurfaceHigh = Color(0xFF1C1C23)
     val Outline = Color(0xFF2A2A33)
-    val Gold = Color(0xFFE8B04B)
-    val GoldDim = Color(0xFF8A6A2E)
+    /** Sky blue, matching the Amiri Video Engine logo background. */
+    val Accent = Color(0xFF87CEEB)
+    val AccentDim = Color(0xFF3F7F9C)
     val Text = Color(0xFFF2F0EB)
     val TextDim = Color(0xFF9A98A0)
     val Danger = Color(0xFFE5675C)
@@ -23,9 +24,9 @@ object AmiriColors {
 }
 
 private val scheme = darkColorScheme(
-    primary = AmiriColors.Gold,
+    primary = AmiriColors.Accent,
     onPrimary = Color(0xFF1A1205),
-    secondary = AmiriColors.Gold,
+    secondary = AmiriColors.Accent,
     background = AmiriColors.Background,
     onBackground = AmiriColors.Text,
     surface = AmiriColors.Surface,

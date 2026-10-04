@@ -1,6 +1,10 @@
 package com.amiri.videoengine.ui.home
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
+import com.amiri.videoengine.R
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -83,8 +87,17 @@ fun HomeScreen(vm: MainViewModel) {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AmiriColors.Background),
                 title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(R.drawable.logo_badge),
+                        contentDescription = "Amiri Video Engine",
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape),
+                    )
+                    Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("AMIRI VIDEO ENGINE", style = MaterialTheme.typography.headlineSmall, color = AmiriColors.Text)
+                        Text("AMIRI VIDEO ENGINE", style = MaterialTheme.typography.headlineSmall.copy(fontSize = 17.sp, letterSpacing = 2.sp), color = AmiriColors.Text)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier
@@ -93,7 +106,7 @@ fun HomeScreen(vm: MainViewModel) {
                                     .background(
                                         when (connection) {
                                             ConnectionState.ONLINE -> AmiriColors.Ok
-                                            ConnectionState.LIMITED -> AmiriColors.Gold
+                                            ConnectionState.LIMITED -> AmiriColors.Accent
                                             ConnectionState.OFFLINE -> AmiriColors.Danger
                                         }
                                     )
@@ -101,6 +114,7 @@ fun HomeScreen(vm: MainViewModel) {
                             Spacer(Modifier.width(6.dp))
                             Text(connection.label, style = MaterialTheme.typography.labelSmall, color = AmiriColors.TextDim)
                         }
+                    }
                     }
                 },
                 actions = {
@@ -130,15 +144,15 @@ fun HomeScreen(vm: MainViewModel) {
                         .fillMaxWidth()
                         .padding(bottom = 14.dp)
                         .clip(shape)
-                        .background(AmiriColors.Gold.copy(alpha = 0.12f))
-                        .border(1.dp, AmiriColors.GoldDim, shape)
+                        .background(AmiriColors.Accent.copy(alpha = 0.12f))
+                        .border(1.dp, AmiriColors.AccentDim, shape)
                         .clickable { vm.navigate(Screen.Generating) }
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         "A video is being generated — tap to view",
-                        color = AmiriColors.Gold,
+                        color = AmiriColors.Accent,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f),
                     )
@@ -174,11 +188,11 @@ fun HomeScreen(vm: MainViewModel) {
                 maxLines = 8,
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AmiriColors.Gold,
+                    focusedBorderColor = AmiriColors.Accent,
                     unfocusedBorderColor = AmiriColors.Outline,
                     focusedContainerColor = AmiriColors.Surface,
                     unfocusedContainerColor = AmiriColors.Surface,
-                    cursorColor = AmiriColors.Gold,
+                    cursorColor = AmiriColors.Accent,
                 ),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -206,7 +220,7 @@ fun HomeScreen(vm: MainViewModel) {
                 Text(
                     "Offline generation is not available for the current model. You can still prepare your video and browse your projects.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AmiriColors.Gold,
+                    color = AmiriColors.Accent,
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
@@ -219,7 +233,7 @@ fun HomeScreen(vm: MainViewModel) {
                 onClick = { vm.generate() },
                 enabled = connection != ConnectionState.OFFLINE,
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AmiriColors.Gold, contentColor = AmiriColors.Background),
+                colors = ButtonDefaults.buttonColors(containerColor = AmiriColors.Accent, contentColor = AmiriColors.Background),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(58.dp),
@@ -267,10 +281,10 @@ private fun AdvancedSection(vm: MainViewModel) {
                 Modifier
                     .size(14.dp)
                     .clip(CircleShape)
-                    .border(1.5.dp, if (selected) AmiriColors.Gold else AmiriColors.Outline, CircleShape)
+                    .border(1.5.dp, if (selected) AmiriColors.Accent else AmiriColors.Outline, CircleShape)
                     .padding(3.dp)
                     .clip(CircleShape)
-                    .background(if (selected) AmiriColors.Gold else AmiriColors.Background)
+                    .background(if (selected) AmiriColors.Accent else AmiriColors.Background)
             )
             Spacer(Modifier.width(10.dp))
             Text(name, color = AmiriColors.Text, style = MaterialTheme.typography.bodyMedium)
@@ -285,7 +299,7 @@ private fun AdvancedSection(vm: MainViewModel) {
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = AmiriColors.Gold,
+            focusedBorderColor = AmiriColors.Accent,
             unfocusedBorderColor = AmiriColors.Outline,
         ),
         modifier = Modifier.fillMaxWidth(),

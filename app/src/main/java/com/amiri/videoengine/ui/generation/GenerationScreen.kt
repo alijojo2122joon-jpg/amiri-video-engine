@@ -88,7 +88,7 @@ fun GenerationScreen(vm: MainViewModel) {
         Text(title, style = MaterialTheme.typography.headlineSmall, color = AmiriColors.Text)
         Spacer(Modifier.height(8.dp))
         state.providerName?.let {
-            Text("Engine: $it", style = MaterialTheme.typography.bodyMedium, color = AmiriColors.Gold)
+            Text("Engine: $it", style = MaterialTheme.typography.bodyMedium, color = AmiriColors.Accent)
         }
         if (state.variations > 1) {
             Text(
@@ -107,7 +107,7 @@ fun GenerationScreen(vm: MainViewModel) {
                     .fillMaxWidth()
                     .height(3.dp)
                     .clip(RoundedCornerShape(2.dp)),
-                color = AmiriColors.Gold,
+                color = AmiriColors.Accent,
                 trackColor = AmiriColors.Surface,
             )
             Spacer(Modifier.height(8.dp))
@@ -155,7 +155,7 @@ fun GenerationScreen(vm: MainViewModel) {
                 Button(
                     onClick = { vm.retryJob() },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AmiriColors.Gold, contentColor = AmiriColors.Background),
+                    colors = ButtonDefaults.buttonColors(containerColor = AmiriColors.Accent, contentColor = AmiriColors.Background),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) { Text("RETRY", style = MaterialTheme.typography.labelLarge) }
                 Spacer(Modifier.height(10.dp))
@@ -165,7 +165,7 @@ fun GenerationScreen(vm: MainViewModel) {
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) { Text("BACK", style = MaterialTheme.typography.labelLarge, color = AmiriColors.Text) }
             }
-            JobStage.COMPLETED -> CircularProgressIndicator(color = AmiriColors.Gold)
+            JobStage.COMPLETED -> CircularProgressIndicator(color = AmiriColors.Accent)
             else -> {
                 OutlinedButton(
                     onClick = { vm.back() },
@@ -192,8 +192,8 @@ private fun StepRow(label: String, done: Boolean, active: Boolean) {
                 .clip(CircleShape)
                 .background(
                     when {
-                        done -> AmiriColors.Gold
-                        active -> AmiriColors.Gold.copy(alpha = 0.2f)
+                        done -> AmiriColors.Accent
+                        active -> AmiriColors.Accent.copy(alpha = 0.2f)
                         else -> AmiriColors.Surface
                     }
                 ),
@@ -201,7 +201,7 @@ private fun StepRow(label: String, done: Boolean, active: Boolean) {
         ) {
             when {
                 done -> Icon(Icons.Filled.Check, contentDescription = null, tint = AmiriColors.Background, modifier = Modifier.size(14.dp))
-                active -> CircularProgressIndicator(color = AmiriColors.Gold, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                active -> CircularProgressIndicator(color = AmiriColors.Accent, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
             }
         }
         Spacer(Modifier.width(14.dp))

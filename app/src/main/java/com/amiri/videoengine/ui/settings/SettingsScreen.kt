@@ -1,6 +1,10 @@
 package com.amiri.videoengine.ui.settings
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.amiri.videoengine.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,6 +82,15 @@ fun SettingsScreen(vm: MainViewModel) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp),
         ) {
+            Image(
+                painter = painterResource(R.drawable.logo_full),
+                contentDescription = "Amiri Video Engine",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp)),
+            )
+            Spacer(Modifier.height(18.dp))
             Text("AI PROVIDERS", style = MaterialTheme.typography.headlineSmall, color = AmiriColors.Text)
 
             SectionTitle("Free engines · Hugging Face")
@@ -90,7 +103,7 @@ fun SettingsScreen(vm: MainViewModel) {
             SecretField(vm, MainViewModel.HF, "Hugging Face token (free, optional)", version)
             Spacer(Modifier.height(8.dp))
             spaces.forEach { p -> ProviderRow(vm, p, version, removable = !p.spec.builtIn) }
-            TextButton(onClick = { vm.refreshStatuses() }) { Text("CHECK STATUS", color = AmiriColors.Gold) }
+            TextButton(onClick = { vm.refreshStatuses() }) { Text("CHECK STATUS", color = AmiriColors.Accent) }
 
             SectionTitle("Add another free Space")
             Body("Paste a Hugging Face Space that makes videos (for example owner/space-name). The engine reads its API automatically.")
@@ -106,7 +119,7 @@ fun SettingsScreen(vm: MainViewModel) {
                 )
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { if (vm.addCustomSpace(spaceInput)) spaceInput = "" }) {
-                    Text("ADD", color = AmiriColors.Gold)
+                    Text("ADD", color = AmiriColors.Accent)
                 }
             }
 
@@ -124,7 +137,7 @@ fun SettingsScreen(vm: MainViewModel) {
 
             SectionTitle("Storage")
             Body(String.format(Locale.US, "Temporary cache: %.1f MB", vm.cacheBytes / 1_048_576.0))
-            TextButton(onClick = { vm.clearCache() }) { Text("CLEAR TEMPORARY CACHE", color = AmiriColors.Gold) }
+            TextButton(onClick = { vm.clearCache() }) { Text("CLEAR TEMPORARY CACHE", color = AmiriColors.Accent) }
 
             SectionTitle("Privacy")
             Body(
@@ -143,9 +156,9 @@ private fun Body(text: String) {
 
 @Composable
 private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = AmiriColors.Gold,
+    focusedBorderColor = AmiriColors.Accent,
     unfocusedBorderColor = AmiriColors.Outline,
-    cursorColor = AmiriColors.Gold,
+    cursorColor = AmiriColors.Accent,
 )
 
 @Composable
@@ -171,7 +184,7 @@ private fun ProviderRow(vm: MainViewModel, p: VideoGenerationProvider, version: 
                     color = when (it) {
                         ProviderStatus.AVAILABLE -> AmiriColors.Ok
                         ProviderStatus.DISABLED -> AmiriColors.TextDim
-                        else -> AmiriColors.Gold
+                        else -> AmiriColors.Accent
                     },
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -185,7 +198,7 @@ private fun ProviderRow(vm: MainViewModel, p: VideoGenerationProvider, version: 
         Switch(
             checked = enabled,
             onCheckedChange = { vm.setProviderEnabled(p.id, it) },
-            colors = SwitchDefaults.colors(checkedTrackColor = AmiriColors.Gold, checkedThumbColor = AmiriColors.Background),
+            colors = SwitchDefaults.colors(checkedTrackColor = AmiriColors.Accent, checkedThumbColor = AmiriColors.Background),
         )
     }
 }
@@ -207,7 +220,7 @@ private fun SecretField(vm: MainViewModel, name: String, label: String, version:
         )
         Row {
             TextButton(onClick = { if (input.isNotBlank()) vm.saveSecret(name, input) }) {
-                Text("SAVE", color = AmiriColors.Gold)
+                Text("SAVE", color = AmiriColors.Accent)
             }
             if (masked != null) {
                 TextButton(onClick = { vm.saveSecret(name, "") }) { Text("REMOVE", color = AmiriColors.TextDim) }

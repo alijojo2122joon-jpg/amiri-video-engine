@@ -112,7 +112,7 @@ fun ResultScreen(vm: MainViewModel, projectId: String) {
                 Button(
                     onClick = { vm.saveToGallery(project, entry.fileName) },
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = AmiriColors.Gold, contentColor = AmiriColors.Background),
+                    colors = ButtonDefaults.buttonColors(containerColor = AmiriColors.Accent, contentColor = AmiriColors.Background),
                     modifier = Modifier.weight(1f).height(50.dp),
                 ) { Text("SAVE", style = MaterialTheme.typography.labelLarge) }
                 OutlinedButton(
@@ -139,7 +139,7 @@ fun ResultScreen(vm: MainViewModel, projectId: String) {
                 onClick = { vm.continueFromLastFrame(project, entry.fileName) },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().height(50.dp),
-            ) { Text("CONTINUE FROM LAST FRAME", style = MaterialTheme.typography.labelLarge, color = AmiriColors.Gold) }
+            ) { Text("CONTINUE FROM LAST FRAME", style = MaterialTheme.typography.labelLarge, color = AmiriColors.Accent) }
             Text(
                 "Makes the next clip start where this one ends — chain clips into a longer story.",
                 style = MaterialTheme.typography.labelSmall,

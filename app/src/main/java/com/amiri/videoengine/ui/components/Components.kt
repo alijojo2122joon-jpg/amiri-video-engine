@@ -74,7 +74,7 @@ fun ImageSlotCard(
             .aspectRatio(0.78f)
             .clip(shape)
             .background(AmiriColors.Surface)
-            .border(BorderStroke(1.dp, if (file != null) AmiriColors.GoldDim else AmiriColors.Outline), shape)
+            .border(BorderStroke(1.dp, if (file != null) AmiriColors.AccentDim else AmiriColors.Outline), shape)
             .clickable(onClick = onPick),
         contentAlignment = Alignment.Center,
     ) {
@@ -110,7 +110,7 @@ fun ImageSlotCard(
             )
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Add, contentDescription = null, tint = AmiriColors.Gold)
+                Icon(Icons.Filled.Add, contentDescription = null, tint = AmiriColors.Accent)
                 Spacer(Modifier.height(6.dp))
                 Text(
                     label,
@@ -145,8 +145,8 @@ fun <T> ChoiceRow(
                     modifier = Modifier
                         .weight(1f)
                         .clip(shape)
-                        .background(if (isSel) AmiriColors.Gold.copy(alpha = 0.14f) else AmiriColors.Surface)
-                        .border(1.dp, if (isSel) AmiriColors.Gold else AmiriColors.Outline, shape)
+                        .background(if (isSel) AmiriColors.Accent.copy(alpha = 0.14f) else AmiriColors.Surface)
+                        .border(1.dp, if (isSel) AmiriColors.Accent else AmiriColors.Outline, shape)
                         .clickable { onSelect(opt) }
                         .padding(vertical = 11.dp),
                     contentAlignment = Alignment.Center,
@@ -154,7 +154,7 @@ fun <T> ChoiceRow(
                     Text(
                         label(opt),
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (isSel) AmiriColors.Gold else AmiriColors.Text,
+                        color = if (isSel) AmiriColors.Accent else AmiriColors.Text,
                     )
                 }
             }
@@ -197,7 +197,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelMedium,
-        color = AmiriColors.Gold,
+        color = AmiriColors.Accent,
         modifier = modifier.padding(top = 20.dp, bottom = 8.dp),
     )
 }
