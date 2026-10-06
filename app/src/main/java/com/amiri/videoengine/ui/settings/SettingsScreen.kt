@@ -101,6 +101,16 @@ fun SettingsScreen(vm: MainViewModel) {
             )
             Spacer(Modifier.height(10.dp))
             SecretField(vm, MainViewModel.HF, "Hugging Face token (free, optional)", version)
+            ToggleRow(
+                vm, version, MainViewModel.SCENE_FROM_TEXT,
+                "Build the scene from my text",
+                "Without a photo, a starting image is drawn from your text first (free FLUX), then animated. Much closer to what you describe.",
+            )
+            ToggleRow(
+                vm, version, MainViewModel.EDIT_PHOTO,
+                "Change my photo to match the text",
+                "If your text asks for a different place, clothes, weather or objects, your photo is adjusted first (free FLUX Kontext, keeps the same person). Needs the AI prompt helper.",
+            )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -257,5 +267,29 @@ private fun SecretField(vm: MainViewModel, name: String, label: String, version:
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ToggleRow(vm: MainViewModel, version: Int, id: String, title: String, desc: String) {
+    val on = remember(version, id) { vm.isProviderEnabled(id) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(AmiriColors.Surface)
+            .padding(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = AmiriColors.Text)
+            Text(desc, style = MaterialTheme.typography.labelSmall, color = AmiriColors.TextDim)
+        }
+        Switch(
+            checked = on,
+            onCheckedChange = { vm.setProviderEnabled(id, it) },
+            colors = SwitchDefaults.colors(checkedTrackColor = AmiriColors.Accent, checkedThumbColor = AmiriColors.Background),
+        )
     }
 }

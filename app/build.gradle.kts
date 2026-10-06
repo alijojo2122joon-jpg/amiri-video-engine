@@ -12,8 +12,8 @@ android {
         applicationId = "com.amiri.videoengine"
         minSdk = 29
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.2.0"
+        versionCode = 6
+        versionName = "1.3.0"
         // realme GT3 (and all modern phones) are 64-bit ARM; drop other CPU libraries to keep the APK small.
         ndk {
             abiFilters += listOf("arm64-v8a")

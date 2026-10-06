@@ -53,10 +53,10 @@ data class GradioEndpoint(
  */
 class GradioClient(private val tokenProvider: () -> String?) {
     val tracker = CallTracker()
-    private val endpointCache = ConcurrentHashMap<String, GradioEndpoint>()
+    private val endpointCache = ConcurrentHashMap<String, List<GradioEndpoint>>()
 
     fun forget(spaceId: String) {
-        endpointCache.remove(spaceId)
+        endpointCache.keys.filter { it.startsWith("$spaceId|") }.forEach { endpointCache.remove(it) }
     }
 
     private fun isHfHost(url: String): Boolean {
@@ -115,9 +115,21 @@ class GradioClient(private val tokenProvider: () -> String?) {
         null
     }
 
-    /** Finds the Space's video-generation endpoint and its parameter list. */
-    suspend fun discover(spaceId: String): GradioEndpoint = withContext(Dispatchers.IO) {
-        endpointCache[spaceId]?.let { return@withContext it }
+    /** What an endpoint must return. */
+    enum class Output(val component: String) { VIDEO("video"), IMAGE("image") }
+
+    /** Best endpoint for [want] (first of [discoverAll]). */
+    suspend fun discover(spaceId: String, want: Output = Output.VIDEO): GradioEndpoint =
+        discoverAll(spaceId, want).first()
+
+    /**
+     * Every endpoint of the Space that returns [want], best first. Spaces often have several
+     * (e.g. /generate for text-to-video and /generate_1 for image-to-video), so callers pick
+     * the one whose inputs fit the request.
+     */
+    suspend fun discoverAll(spaceId: String, want: Output = Output.VIDEO): List<GradioEndpoint> = withContext(Dispatchers.IO) {
+        val cacheKey = "$spaceId|${want.name}"
+        endpointCache[cacheKey]?.let { return@withContext it }
         val base = resolveBaseUrl(spaceId)
 
         val config = getJson("$base/config")
@@ -142,9 +154,9 @@ class GradioClient(private val tokenProvider: () -> String?) {
         }
 
         val named = info.optJSONObject("named_endpoints") ?: JSONObject()
-        var best: GradioEndpoint? = null
-        var bestScore = Int.MIN_VALUE
+        val scored = mutableListOf<Pair<Int, GradioEndpoint>>()
         val keys = named.keys()
+        var order = 0
         while (keys.hasNext()) {
             val apiName = keys.next()
             val ep = named.optJSONObject(apiName) ?: continue
@@ -153,24 +165,60 @@ class GradioClient(private val tokenProvider: () -> String?) {
             val returnComponents = (0 until (returns?.length() ?: 0)).map {
                 returns!!.optJSONObject(it)?.optString("component").orEmpty()
             }
-            val hasVideo = returnComponents.any { it.contains("video", ignoreCase = true) }
+            val returnsWanted = returnComponents.firstOrNull()?.contains(want.component, ignoreCase = true) == true ||
+                returnComponents.any { it.contains(want.component, ignoreCase = true) }
+            if (!returnsWanted) continue
             val hasPrompt = params.any { it.name.contains("prompt", true) && !it.name.contains("negative", true) }
-            var score = 0
-            if (hasVideo) score += 10 else score -= 100
-            if (hasPrompt) score += 5
-            if (apiName.contains("generate", true)) score += 3
-            if (apiName.contains("video", true)) score += 1
-            if (score > bestScore) {
-                bestScore = score
-                best = GradioEndpoint(base, prefix, apiName, params, returnComponents)
+            var score = 100 - order
+            if (hasPrompt) score += 50
+            if (apiName.contains("generate", true) || apiName.contains("infer", true)) score += 20
+            scored += score to GradioEndpoint(base, prefix, apiName, params, returnComponents)
+            order++
+        }
+        if (scored.isEmpty()) {
+            throw ProviderException(ProviderException.Kind.UNSUPPORTED, "No ${want.component} endpoint in $spaceId")
+        }
+        val list = scored.sortedByDescending { it.first }.map { it.second }
+        endpointCache[cacheKey] = list
+        list
+    }
+
+    /** Pulls the first file of the wanted kind out of a Gradio result. */
+    fun findFileUrl(result: JSONArray, ep: GradioEndpoint, want: Output): String? {
+        val exts = when (want) {
+            Output.VIDEO -> listOf(".mp4", ".webm", ".mov")
+            Output.IMAGE -> listOf(".png", ".jpg", ".jpeg", ".webp")
+        }
+        fun looksRight(s: String): Boolean {
+            val l = s.lowercase().substringBefore('?')
+            return exts.any { l.endsWith(it) }
+        }
+        fun urlOf(o: JSONObject): String? =
+            o.strOrNull("url") ?: o.strOrNull("path")?.let { "${ep.root}/file=$it" }
+
+        val candidates = mutableListOf<String>()
+        for (i in 0 until result.length()) {
+            when (val v = result.opt(i)) {
+                is JSONObject -> {
+                    val obj = v.optJSONObject(want.component) ?: v
+                    urlOf(obj)?.let { candidates += it }
+                }
+                is JSONArray -> {
+                    // Galleries return [[{image:{...}}, caption], ...]
+                    for (j in 0 until v.length()) {
+                        val item = v.opt(j)
+                        val o = when (item) {
+                            is JSONObject -> item.optJSONObject(want.component) ?: item
+                            is JSONArray -> item.optJSONObject(0)?.let { it.optJSONObject(want.component) ?: it }
+                            else -> null
+                        }
+                        o?.let { urlOf(it) }?.let { candidates += it }
+                    }
+                }
+                is String -> if (looksRight(v)) candidates += "${ep.root}/file=$v"
             }
         }
-        val chosen = best
-        if (chosen == null || bestScore < 0) {
-            throw ProviderException(ProviderException.Kind.UNSUPPORTED, "No video endpoint in $spaceId")
-        }
-        endpointCache[spaceId] = chosen
-        chosen
+        return candidates.firstOrNull { looksRight(it) } ?: candidates.firstOrNull()
     }
 
     private fun parseParams(arr: JSONArray?): List<GradioParam> {

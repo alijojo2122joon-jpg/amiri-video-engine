@@ -1,6 +1,9 @@
 package com.amiri.videoengine.ui.generation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.layout.ContentScale
+import com.amiri.videoengine.ui.components.rememberThumbnail
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +101,24 @@ fun GenerationScreen(vm: MainViewModel) {
             )
         }
         Spacer(Modifier.height(24.dp))
+        val frameFile = state.previewFrame?.let { java.io.File(it) }
+        val frame = rememberThumbnail(frameFile, 480)
+        if (frame != null) {
+            Image(
+                bitmap = frame,
+                contentDescription = "Starting frame",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .clip(RoundedCornerShape(14.dp)),
+            )
+            Text(
+                "Starting frame made from your text",
+                style = MaterialTheme.typography.labelSmall,
+                color = AmiriColors.TextDim,
+                modifier = Modifier.padding(top = 6.dp, bottom = 18.dp),
+            )
+        }
 
         if (state.stage.isActive) {
             // Indeterminate on purpose: free engines don't report a real percentage,
@@ -138,7 +159,7 @@ fun GenerationScreen(vm: MainViewModel) {
         if (state.stage.isActive) {
             Spacer(Modifier.height(8.dp))
             Text(
-                "Free engines can take 1–5 minutes, longer if many people are using them. You can leave this screen; it keeps working while the app is open.",
+                "Free engines usually take 1–4 minutes (longer when many people use them). You can leave this screen; it keeps working while the app is open.",
                 style = MaterialTheme.typography.labelSmall,
                 color = AmiriColors.TextDim,
                 textAlign = TextAlign.Center,

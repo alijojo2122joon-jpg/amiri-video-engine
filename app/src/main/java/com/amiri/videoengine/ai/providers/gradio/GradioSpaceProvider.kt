@@ -70,23 +70,17 @@ class GradioSpaceProvider(
         onProgress: (ProviderProgress) -> Unit,
     ): ProviderOutput {
         onProgress(ProviderProgress(JobStage.SUBMITTING, "Connecting to ${spec.displayName}…"))
-        val ep = try {
-            client.discover(spec.spaceId)
+        val endpoints = try {
+            client.discoverAll(spec.spaceId, GradioClient.Output.VIDEO)
         } catch (e: ProviderException) {
             client.forget(spec.spaceId)
             throw e
         }
-
-        val imageParams = ep.params.filter { isImageParam(it) }
-        val roles = assignImageRoles(imageParams)
-        when (request.mode) {
-            GenerationMode.FIRST_LAST_TO_VIDEO ->
-                if (roles.values.count { it == ImageRole.FIRST || it == ImageRole.LAST } < 2) unsupported()
-            GenerationMode.IMAGE_TO_VIDEO ->
-                if (roles.values.none { it == ImageRole.FIRST }) unsupported()
-            GenerationMode.TEXT_TO_VIDEO ->
-                if (imageParams.any { !it.hasDefault }) unsupported()
-        }
+        // Pick the endpoint whose inputs fit this request (Spaces often have one per mode).
+        val (ep, roles) = endpoints.asSequence()
+            .map { it to assignImageRoles(it.params.filter { p -> isImageParam(p) }) }
+            .firstOrNull { (e, r) -> fits(e, r, request.mode) }
+            ?: unsupported()
 
         val uploads = mutableMapOf<ImageRole, JSONObject>()
         if (request.firstFrame != null || request.lastFrame != null) {
@@ -117,7 +111,7 @@ class GradioSpaceProvider(
             }
         }
 
-        val videoUrl = findVideoUrl(result, ep)
+        val videoUrl = client.findFileUrl(result, ep, GradioClient.Output.VIDEO)
             ?: throw ProviderException(ProviderException.Kind.UNKNOWN, "Engine returned no video")
         onProgress(ProviderProgress(JobStage.DOWNLOADING, "Downloading video…"))
         client.download(videoUrl, outputFile)
@@ -126,6 +120,17 @@ class GradioSpaceProvider(
         }
         val seed = (0 until result.length()).map { result.opt(it) }.firstOrNull { it is Number } as? Number
         return ProviderOutput(outputFile, seed?.toLong())
+    }
+
+    private fun fits(ep: GradioEndpoint, roles: Map<String, ImageRole>, mode: GenerationMode): Boolean {
+        val images = ep.params.filter { isImageParam(it) }
+        val firsts = roles.values.count { it == ImageRole.FIRST }
+        val lasts = roles.values.count { it == ImageRole.LAST }
+        return when (mode) {
+            GenerationMode.FIRST_LAST_TO_VIDEO -> firsts >= 1 && lasts >= 1
+            GenerationMode.IMAGE_TO_VIDEO -> firsts >= 1
+            GenerationMode.TEXT_TO_VIDEO -> images.none { !it.hasDefault }
+        }
     }
 
     private fun unsupported(): Nothing =
@@ -221,26 +226,4 @@ class GradioSpaceProvider(
     }
 
     private fun round32(v: Float): Int = max(256, ((v / 32f).roundToInt()) * 32)
-
-    private fun findVideoUrl(result: JSONArray, ep: GradioEndpoint): String? {
-        val candidates = mutableListOf<String>()
-        for (i in 0 until result.length()) {
-            when (val v = result.opt(i)) {
-                is JSONObject -> {
-                    val obj = v.optJSONObject("video") ?: v
-                    urlOf(obj, ep)?.let { candidates += it }
-                }
-                is String -> if (looksLikeVideo(v)) candidates += "${ep.root}/file=$v"
-            }
-        }
-        return candidates.firstOrNull { looksLikeVideo(it) } ?: candidates.firstOrNull()
-    }
-
-    private fun urlOf(o: JSONObject, ep: GradioEndpoint): String? =
-        o.strOrNull("url") ?: o.strOrNull("path")?.let { "${ep.root}/file=$it" }
-
-    private fun looksLikeVideo(s: String): Boolean {
-        val l = s.lowercase().substringBefore('?')
-        return l.endsWith(".mp4") || l.endsWith(".webm") || l.endsWith(".mov")
-    }
 }

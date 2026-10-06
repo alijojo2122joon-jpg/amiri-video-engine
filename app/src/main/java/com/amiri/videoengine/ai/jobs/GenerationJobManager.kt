@@ -38,6 +38,8 @@ data class JobState(
     val variations: Int,
     val notes: List<String>,
     val sendsImages: Boolean,
+    /** Starting frame that was generated / edited from the text, shown while generating. */
+    val previewFrame: String? = null,
 )
 
 /**
@@ -53,6 +55,9 @@ class GenerationJobManager(
     private val video: VideoPostProcessor,
     private val repo: ProjectRepository,
     private val prompts: PromptPreparer,
+    private val scenes: com.amiri.videoengine.ai.scene.SceneMaker,
+    private val sceneFromText: () -> Boolean,
+    private val editPhoto: () -> Boolean,
 ) {
     private val _state = MutableStateFlow<JobState?>(null)
     val state: StateFlow<JobState?> = _state.asStateFlow()
@@ -74,6 +79,7 @@ class GenerationJobManager(
 
     fun cancel() {
         router.cancel()
+        scenes.cancel()
         job?.cancel()
     }
 
@@ -142,33 +148,53 @@ class GenerationJobManager(
             val firstReady = firstOrig?.let { images.prepareForProvider(it, input.aspect) }
             val lastReady = lastOrig?.let { images.prepareForProvider(it, input.aspect) }
 
-            // 3) Prompt: understand it in English (AI rewrite / on-device translation), keep intent.
+            // 3) Prompt: understand it (any language) and split it into scene / photo change / motion.
             set(JobStage.PREPARING, JobStep.ANALYZE_PROMPT, "Analyzing prompt…")
-            val mode = when {
-                firstReady != null && lastReady != null -> com.amiri.videoengine.ai.model.GenerationMode.FIRST_LAST_TO_VIDEO
-                firstReady != null -> com.amiri.videoengine.ai.model.GenerationMode.IMAGE_TO_VIDEO
-                else -> com.amiri.videoengine.ai.model.GenerationMode.TEXT_TO_VIDEO
-            }
             val reviewed = input.englishPrompt?.trim()?.takeIf { it.isNotEmpty() }
-            val english = if (reviewed != null) {
-                reviewed
-            } else {
-                val prepared = prompts.prepare(input.prompt, mode) { msg ->
-                    set(JobStage.PREPARING, JobStep.ANALYZE_PROMPT, msg)
-                }
-                if (prepared.method != PromptPreparer.Method.ORIGINAL) notes += "Prompt: ${prepared.method.label}."
-                if (prepared.method == PromptPreparer.Method.ORIGINAL && prompts.isNonEnglish(input.prompt)) {
-                    notes += "Your prompt could not be translated, so the engine may not understand it. Check the internet connection or write it in English."
-                }
-                prepared.english
+            val plan = prompts.plan(
+                text = reviewed ?: input.prompt,
+                hasPhoto = firstReady != null,
+                firstAndLast = firstReady != null && lastReady != null,
+            ) { msg -> set(JobStage.PREPARING, JobStep.ANALYZE_PROMPT, msg) }
+            if (plan.method != PromptPreparer.Method.ORIGINAL) notes += "Prompt: ${plan.method.label}."
+            if (plan.method == PromptPreparer.Method.ORIGINAL && prompts.isNonEnglish(plan.motion)) {
+                notes += "Your prompt could not be translated, so the engine may not understand it. Check the internet connection, add your free Hugging Face token, or write it in English."
             }
+
+            // 4) Make the starting frame match the text. Video models only animate what is
+            //    already in the first frame, so this is what makes the video follow the prompt.
+            var startFrame = firstReady
+            val wantsText = input.prompt.isNotBlank()
+            if (startFrame == null && wantsText && sceneFromText()) {
+                set(JobStage.PREPARING, JobStep.CREATE_SCENE, "Creating the scene from your text…")
+                val made = scenes.createImage(plan.scene, input.aspect, File(dir, "first_generated.jpg"))
+                if (made != null) {
+                    startFrame = images.prepareForProvider(made, input.aspect)
+                    _state.update { it?.copy(previewFrame = made.absolutePath) }
+                    notes += "The starting frame was created from your text, then animated."
+                } else {
+                    notes += "The scene could not be pre-drawn right now, so the video was made from text directly."
+                }
+            } else if (startFrame != null && lastReady == null && plan.edit.isNotBlank() && editPhoto()) {
+                set(JobStage.PREPARING, JobStep.CREATE_SCENE, "Changing your photo to match the text…")
+                val edited = scenes.editImage(startFrame, plan.edit, input.quality, File(dir, "first_edited.jpg"))
+                if (edited != null) {
+                    startFrame = images.prepareForProvider(edited, input.aspect)
+                    _state.update { it?.copy(previewFrame = edited.absolutePath) }
+                    notes += "Your photo was adjusted to match the text (${plan.edit.take(120)}), then animated."
+                } else {
+                    notes += "Your photo could not be adjusted right now, so only movement from the text was applied."
+                }
+            }
+
+            val english = plan.motion
             val structured = PromptEngine.analyze(english)
             val baseRequest = GenerationRequest(
                 prompt = input.prompt,
                 finalPrompt = "",
                 negativePrompt = PromptEngine.NEGATIVE_PROMPT,
                 structured = structured,
-                firstFrame = firstReady,
+                firstFrame = startFrame,
                 lastFrame = lastReady,
                 aspect = input.aspect,
                 duration = input.duration,
@@ -176,7 +202,11 @@ class GenerationJobManager(
                 seed = input.advanced.seed,
                 resolution = input.advanced.resolution,
             )
-            val finalPrompt = if (reviewed != null) reviewed else PromptEngine.buildFinalPrompt(structured, baseRequest.mode, input.quality)
+            val finalPrompt = if (plan.method == PromptPreparer.Method.AI) {
+                english
+            } else {
+                PromptEngine.buildFinalPrompt(structured, baseRequest.mode, input.quality)
+            }
             _state.update { it?.copy(notes = notes.toList()) }
 
             var project = Project(

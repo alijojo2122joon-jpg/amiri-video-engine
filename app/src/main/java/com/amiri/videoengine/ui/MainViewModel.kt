@@ -82,6 +82,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var settingsVersion by mutableIntStateOf(0)
         private set
 
+    /** Re-read whenever settings change (settingsVersion) or the screen changes. */
+    val hasHfToken: Boolean
+        get() {
+            settingsVersion
+            screen
+            return c.secrets.has(SecretStore.HF_TOKEN)
+        }
+
     val jobState = c.jobs.state
     val projects = c.projects.projects
     val connection = c.connection.state
@@ -398,5 +406,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val GOOGLE = SecretStore.GOOGLE_KEY
         val XAI = SecretStore.XAI_KEY
         val PROMPT_AI = AppContainer.PROMPT_AI_ID
+        val SCENE_FROM_TEXT = AppContainer.SCENE_FROM_TEXT_ID
+        val EDIT_PHOTO = AppContainer.EDIT_PHOTO_ID
     }
 }

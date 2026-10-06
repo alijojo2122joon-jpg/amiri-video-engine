@@ -12,6 +12,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -60,9 +61,141 @@ class PromptPreparer(
         }
         if (isNonEnglish(text)) {
             onStatus("Translating your prompt to English…")
-            translateOnDevice(text)?.let { return Prepared(it, Method.TRANSLATED) }
+            translate(text)?.let { return Prepared(it, Method.TRANSLATED) }
         }
         return Prepared(text, Method.ORIGINAL)
+    }
+
+    /** Persian/Dari → English: on the phone first (offline), then the free MyMemory service. */
+    suspend fun translate(text: String): String? =
+        withTimeoutOrNull(25_000) { translateOnDevice(text) } ?: translateOnline(text)
+
+    // ---------------- Director: split the request into scene / photo change / motion ----------------
+
+    data class Plan(
+        /** What the first frame should show (used to create it when there is no photo). */
+        val scene: String,
+        /** What to change in the user's photo so it matches the text. Empty = keep the photo. */
+        val edit: String,
+        /** The video prompt: actions in order + camera. */
+        val motion: String,
+        val method: Method,
+    )
+
+    suspend fun plan(
+        text: String,
+        hasPhoto: Boolean,
+        firstAndLast: Boolean,
+        onStatus: (String) -> Unit = {},
+    ): Plan {
+        val clean = text.trim()
+        val token = tokenProvider()
+        if (clean.isNotEmpty() && !token.isNullOrBlank() && aiEnabled()) {
+            onStatus("Understanding your prompt with AI…")
+            direct(clean, hasPhoto, firstAndLast, token)?.let { return it }
+        }
+        val english = when {
+            clean.isEmpty() -> ""
+            isNonEnglish(clean) -> {
+                onStatus("Translating your prompt to English…")
+                translate(clean)
+            }
+            else -> clean
+        }
+        return if (english == null) {
+            Plan(clean, "", clean, Method.ORIGINAL)
+        } else {
+            Plan(english, "", english, if (english == clean) Method.ORIGINAL else Method.TRANSLATED)
+        }
+    }
+
+    private suspend fun direct(text: String, hasPhoto: Boolean, firstAndLast: Boolean, token: String): Plan? {
+        val photoRule = when {
+            firstAndLast ->
+                "The user gave a FIRST and a LAST image. \"edit\" must be \"\". \"motion\" describes how the first image changes into the last one."
+            hasPhoto ->
+                "The user gave a PHOTO that will be the first frame. In \"edit\" write a short instruction (max 40 words) for an image editor that changes the photo so that its STARTING state matches the request — e.g. a different place/background, time of day, weather, clothing, added objects or animals that must be visible from the start. Always end it with \"Keep the same person, face and pose.\" If the photo only needs to MOVE (actions, gestures, camera), \"edit\" must be \"\"."
+            else ->
+                "There is no photo. \"edit\" must be \"\"."
+        }
+        val system = """
+You are the director of an AI video generator. The user's request may be in Persian/Dari or any language. Answer ONLY with one JSON object:
+{"scene": "...", "edit": "...", "motion": "..."}
+- "scene": English description of the FIRST FRAME as a still photo: who/what, look, clothing, place, time, weather, lighting, framing, style. Only what is visible at the very start, before anything moves. 30-70 words.
+- "motion": English video prompt: the subject and EVERY action the user asked for, in order, with direction and speed, plus camera movement. Present tense, concrete and visible, 40-90 words. Mention the place and key details again.
+- $photoRule
+Keep every detail the user asked for. Never add new story events, never drop anything, never refuse. No text outside the JSON.
+""".trim()
+        for (model in MODELS) {
+            try {
+                val raw = chat(model, system, text, token) ?: continue
+                val json = raw.replace(Regex("(?s)<think>.*?</think>"), "")
+                val a = json.indexOf('{')
+                val b = json.lastIndexOf('}')
+                if (a < 0 || b <= a) continue
+                val o = JSONObject(json.substring(a, b + 1))
+                val motion = cleanup(o.optString("motion"))
+                val scene = cleanup(o.optString("scene")).ifBlank { motion }
+                val edit = if (hasPhoto && !firstAndLast) cleanup(o.optString("edit")) else ""
+                if (motion.length < 8 || isNonEnglish(motion) || isNonEnglish(scene) || isNonEnglish(edit)) continue
+                return Plan(scene, edit, motion, Method.AI)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // next model
+            }
+        }
+        return null
+    }
+
+    // ---------------- Free online translation fallback (MyMemory, no key needed) ----------------
+
+    private suspend fun translateOnline(text: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val parts = chunk(text, 450)
+            val out = StringBuilder()
+            for (part in parts) {
+                val url = okhttp3.HttpUrl.Builder()
+                    .scheme("https")
+                    .host("api.mymemory.translated.net")
+                    .addPathSegment("get")
+                    .addQueryParameter("q", part)
+                    .addQueryParameter("langpair", "fa|en")
+                    .build()
+                val piece = Http.quick.await(Request.Builder().url(url).get().build()).use { r ->
+                    if (!r.isSuccessful) return@use null
+                    JSONObject(r.body?.string().orEmpty()).optJSONObject("responseData")
+                        ?.optString("translatedText")?.takeIf { it.isNotBlank() }
+                } ?: return@withContext null
+                if (out.isNotEmpty()) out.append(' ')
+                out.append(piece)
+            }
+            out.toString().trim().takeIf { it.isNotEmpty() && !isNonEnglish(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun chunk(text: String, max: Int): List<String> {
+        if (text.length <= max) return listOf(text)
+        val sentences = text.split(Regex("(?<=[.!؟?،,\\n])\\s*"))
+        val out = mutableListOf<String>()
+        val cur = StringBuilder()
+        for (s in sentences) {
+            if (cur.length + s.length + 1 > max && cur.isNotEmpty()) {
+                out += cur.toString(); cur.setLength(0)
+            }
+            if (s.length > max) {
+                s.chunked(max).forEach { out += it }
+            } else {
+                if (cur.isNotEmpty()) cur.append(' ')
+                cur.append(s)
+            }
+        }
+        if (cur.isNotEmpty()) out += cur.toString()
+        return out
     }
 
     // ---------------- AI rewrite (Hugging Face Inference Providers) ----------------
@@ -119,7 +252,7 @@ Rules:
                 .post(body.toString().toRequestBody("application/json".toMediaType()))
                 .build()
             Http.quick.newBuilder()
-                .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
                 .build()
                 .await(req)
                 .use { r ->

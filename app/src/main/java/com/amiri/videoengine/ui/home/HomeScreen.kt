@@ -139,6 +139,7 @@ fun HomeScreen(vm: MainViewModel) {
                 .padding(horizontal = 18.dp),
         ) {
             val running = job?.stage?.isActive == true
+            if (!vm.hasHfToken) TokenBanner(vm)
             if (running) {
                 val shape = RoundedCornerShape(12.dp)
                 Row(
@@ -368,7 +369,7 @@ private fun EnglishPromptSection(vm: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            (vm.englishMethod ?: "") + " · You can edit it. This exact text is sent.",
+            (vm.englishMethod ?: "") + " · You can edit it. The video is planned from this text.",
             style = MaterialTheme.typography.labelSmall,
             color = AmiriColors.TextDim,
             modifier = Modifier.padding(top = 4.dp),
@@ -383,5 +384,49 @@ private fun EnglishPromptSection(vm: MainViewModel) {
             style = MaterialTheme.typography.labelSmall,
             color = if (nonEnglish) AmiriColors.Accent else AmiriColors.TextDim,
         )
+    }
+}
+
+/** The free Hugging Face token unlocks real prompt understanding and more free GPU time. */
+@Composable
+private fun TokenBanner(vm: MainViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 14.dp)
+            .clip(shape)
+            .background(AmiriColors.Accent.copy(alpha = 0.10f))
+            .border(1.dp, AmiriColors.AccentDim, shape)
+            .padding(14.dp),
+    ) {
+        Text("Make it understand you better (free)", style = MaterialTheme.typography.titleMedium, color = AmiriColors.Accent)
+        Text(
+            "Connect a free Hugging Face token: the AI then understands Persian exactly, builds the scene you describe, and you get more free video time.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = AmiriColors.Text,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            "1) Tap GET TOKEN and sign up / log in  2) Create the token (type Read) and copy it  3) Paste it in Settings.",
+            style = MaterialTheme.typography.labelSmall,
+            color = AmiriColors.TextDim,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Row(Modifier.padding(top = 4.dp)) {
+            TextButton(onClick = {
+                try {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://huggingface.co/settings/tokens/new?tokenType=read&description=Amiri%20Video%20Engine"),
+                        )
+                    )
+                } catch (_: Exception) {
+                }
+            }) { Text("GET TOKEN", color = AmiriColors.Accent) }
+            TextButton(onClick = { vm.navigate(Screen.Settings) }) { Text("PASTE IN SETTINGS", color = AmiriColors.Accent) }
+        }
     }
 }

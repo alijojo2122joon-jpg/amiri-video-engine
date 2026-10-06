@@ -11,6 +11,7 @@ import com.amiri.videoengine.ai.providers.gradio.GradioSpaceProvider
 import com.amiri.videoengine.ai.providers.gradio.SpaceCatalog
 import com.amiri.videoengine.ai.providers.local.LocalProvider
 import com.amiri.videoengine.ai.router.ModelRouter
+import com.amiri.videoengine.ai.scene.SceneMaker
 import com.amiri.videoengine.image.ImagePreprocessor
 import com.amiri.videoengine.network.ConnectionManager
 import com.amiri.videoengine.security.SecretStore
@@ -77,9 +78,16 @@ class AppContainer(app: Application) {
     )
 
     val router = ModelRouter({ providers() }, connection)
-    val jobs = GenerationJobManager(appScope, router, images, video, projects, prompts)
+    val scenes = SceneMaker(gradio) { secrets.get(SecretStore.HF_TOKEN) }
+    val jobs = GenerationJobManager(
+        appScope, router, images, video, projects, prompts, scenes,
+        sceneFromText = { providerSettings.isEnabled(SCENE_FROM_TEXT_ID, true) },
+        editPhoto = { providerSettings.isEnabled(EDIT_PHOTO_ID, true) },
+    )
 
     companion object {
         const val PROMPT_AI_ID = "prompt_ai"
+        const val SCENE_FROM_TEXT_ID = "scene_from_text"
+        const val EDIT_PHOTO_ID = "edit_photo"
     }
 }

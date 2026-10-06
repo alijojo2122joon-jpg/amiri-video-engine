@@ -165,7 +165,8 @@ enum class JobStage {
 /** The visible checklist on the generation screen. Each step is real work. */
 enum class JobStep(val label: String) {
     PREPARE_IMAGES("Preparing images"),
-    ANALYZE_PROMPT("Analyzing prompt"),
+    ANALYZE_PROMPT("Understanding your prompt"),
+    CREATE_SCENE("Building the scene from your text"),
     CONNECT("Connecting to AI engine"),
     GENERATE("Generating frames"),
     PROCESS("Processing video"),
